@@ -39,6 +39,11 @@ Run the main script and specify the year and round:
 python main.py --year 2025 --round 12
 ```
 
+The application will load a pre-computed telemetry dataset if you have run it before for the same event. To force re-computation of telemetry data, use the `--refresh-data` flag:
+```bash
+python main.py --year 2025 --round 12 --refresh-data
+```
+
 ## File Structure
 
 - `main.py` — Entry point, handles session loading and starts the replay.
