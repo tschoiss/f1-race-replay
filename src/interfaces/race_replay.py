@@ -12,7 +12,7 @@ SCREEN_TITLE = "F1 Replay"
 
 class F1RaceReplayWindow(arcade.Window):
     def __init__(self, frames, track_statuses, example_lap, drivers, title,
-                 playback_speed=1.0, driver_colors=None, circuit_rotation=0.0,
+                 playback_speed=1.0, driver_colors=None, driver_teams=None, driver_names=None, circuit_rotation=0.0,
                  left_ui_margin=340, right_ui_margin=260, total_laps=None):
         # Set resizable to True so the user can adjust mid-sim
         super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, title, resizable=True)
@@ -23,9 +23,12 @@ class F1RaceReplayWindow(arcade.Window):
         self.drivers = list(drivers)
         self.playback_speed = playback_speed
         self.driver_colors = driver_colors or {}
+        self.driver_teams = driver_teams or {}
+        self.driver_names = driver_names or {}
         self.frame_index = 0.0  # use float for fractional-frame accumulation
         self.paused = False
         self._tyre_textures = {}
+        self._driver_textures = {}
         self.total_laps = total_laps
         self.has_weather = any("weather" in frame for frame in frames) if frames else False
 
@@ -52,6 +55,14 @@ class F1RaceReplayWindow(arcade.Window):
                     texture_name = os.path.splitext(filename)[0]
                     texture_path = os.path.join(tyres_folder, filename)
                     self._tyre_textures[texture_name] = arcade.load_texture(texture_path)
+
+        drivers_folder = os.path.join("images", "drivers")
+        if os.path.exists(drivers_folder):
+            for filename in os.listdir(drivers_folder):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    texture_name = os.path.splitext(filename)[0]
+                    texture_path = os.path.join(drivers_folder, filename)
+                    self._driver_textures[texture_name] = arcade.load_texture(texture_path)
 
         # Build track geometry (Raw World Coordinates)
         (self.plot_x_ref, self.plot_y_ref,
@@ -404,11 +415,11 @@ class F1RaceReplayWindow(arcade.Window):
         if symbol == arcade.key.SPACE:
             self.paused = not self.paused
         elif symbol == arcade.key.RIGHT:
-            self.frame_index = min(self.frame_index + 10.0, self.n_frames - 1)
+            self.frame_index = min(self.frame_index + 10.0 * self.playback_speed, self.n_frames - 1)
         elif symbol == arcade.key.LEFT:
-            self.frame_index = max(self.frame_index - 10.0, 0.0)
+            self.frame_index = max(self.frame_index - 10.0 * self.playback_speed, 0.0)
         elif symbol == arcade.key.UP:
-            self.playback_speed *= 2.0
+            self.playback_speed = min(512, self.playback_speed * 2.0)
         elif symbol == arcade.key.DOWN:
             self.playback_speed = max(0.1, self.playback_speed / 2.0)
         elif symbol == arcade.key.KEY_1:

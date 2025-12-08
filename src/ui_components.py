@@ -332,6 +332,8 @@ class DriverInfoComponent(BaseComponent):
             return
         code = window.selected_driver
         frame = window.frames[min(int(window.frame_index), window.n_frames-1)]
+        driver_team = window.driver_teams.get(code, "Unknown Team")
+        fullname = window.driver_names.get(code)
         driver_pos = frame["drivers"].get(code, {})
         # layout
         info_x = self.left
@@ -350,12 +352,29 @@ class DriverInfoComponent(BaseComponent):
         arcade.draw_rect_outline(bg_rect, self._get_driver_color(window, code))
         name_rect = arcade.XYWH(info_x + box_width / 2, info_y + 20, box_width, 40)
         arcade.draw_rect_filled(name_rect, self._get_driver_color(window, code))
-        arcade.Text(f"Driver: {code}", info_x + 10, info_y + 20, arcade.color.BLACK, 16, anchor_x="left", anchor_y="center").draw()
+        arcade.Text(f"{code} - {fullname}", info_x + 10, info_y + 20, arcade.color.BLACK, 16, anchor_x="left", anchor_y="center").draw()
         # stats
+        
         speed_text = f"Speed: {driver_pos.get('speed',0):.1f} km/h"
         gear_text = f"Gear: {driver_pos.get('gear',0)}"
         drs_text = f"DRS: {driver_pos.get('drs','-')}"
-        lines = [speed_text, gear_text, drs_text, f"Current Lap: {driver_pos.get('lap',1)}"]
+        team_text = f"Team: {driver_team}"
+        lines = [speed_text, gear_text, drs_text, f"Current Lap: {driver_pos.get('lap',1)}", team_text]
+        driver_texture = window._driver_textures.get(code)
+        if driver_texture:
+            img_size = 130
+            img_rect = arcade.XYWH(
+                info_x + box_width/1.3,
+                info_y + box_height - 220,
+                img_size,
+                img_size
+            )
+            arcade.draw_texture_rect(
+                rect=img_rect,
+                texture= driver_texture,
+                angle=0,
+                alpha=255
+            )
         for i, ln in enumerate(lines):
             arcade.Text(ln, info_x + 10, info_y - 20 - (i * 25), arcade.color.WHITE, 14, anchor_x="left", anchor_y="center").draw()
     def _get_driver_color(self, window, code):

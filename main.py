@@ -1,4 +1,4 @@
-from src.f1_data import get_race_telemetry, enable_cache, get_circuit_rotation, load_session, get_quali_telemetry
+from src.f1_data import get_race_telemetry, enable_cache, get_circuit_rotation, load_session, get_quali_telemetry, download_driver_headshots_img
 from src.arcade_replay import run_arcade_replay
 
 from src.interfaces.qualifying import run_qualifying_replay
@@ -40,6 +40,7 @@ def main(year=None, round_number=None, playback_speed=1, session_type='R'):
     example_lap = session.laps.pick_fastest().get_telemetry()
 
     drivers = session.drivers
+    download_driver_headshots_img(session,drivers)
 
     # Get circuit rotation
 
@@ -57,6 +58,8 @@ def main(year=None, round_number=None, playback_speed=1, session_type='R'):
         drivers=drivers,
         playback_speed=1.0,
         driver_colors=race_telemetry['driver_colors'],
+        driver_teams=race_telemetry['driver_teams'],
+        driver_names=race_telemetry['driver_names'],
         title=f"{session.event['EventName']} - {'Sprint' if session_type == 'S' else 'Race'}",
         total_laps=race_telemetry['total_laps'],
         circuit_rotation=circuit_rotation,
@@ -77,7 +80,7 @@ if __name__ == "__main__":
     round_index = sys.argv.index("--round") + 1
     round_number = int(sys.argv[round_index])
   else:
-    round_number = 12  # Default round number
+    round_number = 24  # Default round number
 
   playback_speed = 1
 

@@ -7,6 +7,10 @@ import numpy as np
 import json
 import pickle
 from datetime import timedelta
+import requests
+from src.lib.weather import resample_weather
+from src.lib.weather import build_weather_snapshot
+
 
 from src.lib.tyres import get_tyre_compound_int
 
@@ -139,6 +143,26 @@ def get_driver_colors(session):
         rgb_colors[driver] = rgb
     return rgb_colors
 
+def download_driver_headshots_img(session,drivers):
+    img_dir  = "images/drivers"
+    os.makedirs(img_dir, exist_ok=True)
+    i = 0
+    for driver in drivers:
+        i += 1
+        headshot_url = session.get_driver(driver)['HeadshotUrl']
+        filename = os.path.join(img_dir, f"{session.get_driver(driver)['Abbreviation']}.png")
+
+        if os.path.exists(filename) or headshot_url == 'None':
+            continue
+
+        print(f"Downloading image for {driver}...")
+
+        response = requests.get(headshot_url.replace(".transform/1col/image.png",""), timeout=10)
+        response.raise_for_status()
+
+        with open(filename, "wb") as f:
+            f.write(response.content)
+
 def get_circuit_rotation(session):
     circuit = session.get_circuit_info()
     return circuit.rotation
@@ -163,10 +187,16 @@ def get_race_telemetry(session, session_type='R'):
 
     drivers = session.drivers
 
-    driver_codes = {
-        num: session.get_driver(num)["Abbreviation"]
-        for num in drivers
-    }
+    driver_codes = {}
+    driver_names = {}
+    driver_teams = {}
+    for num in drivers:
+        driver = session.get_driver(num)
+        abbrev = driver["Abbreviation"]
+
+        driver_codes[num] = abbrev
+        driver_names[abbrev] = driver["FullName"]
+        driver_teams[abbrev] = driver["TeamName"]
 
     driver_data = {}
 
@@ -271,41 +301,7 @@ def get_race_telemetry(session, session_type='R'):
         })
 
     # 4.1. Resample weather data onto the same timeline for playback
-    weather_resampled = None
-    weather_df = getattr(session, "weather_data", None)
-    if weather_df is not None and not weather_df.empty:
-        try:
-            weather_times = weather_df["Time"].dt.total_seconds().to_numpy() - global_t_min
-            if len(weather_times) > 0:
-                order = np.argsort(weather_times)
-                weather_times = weather_times[order]
-
-                def _maybe_get(name):
-                    return weather_df[name].to_numpy()[order] if name in weather_df else None
-
-                def _resample(series):
-                    if series is None:
-                        return None
-                    return np.interp(timeline, weather_times, series)
-
-                track_temp = _resample(_maybe_get("TrackTemp"))
-                air_temp = _resample(_maybe_get("AirTemp"))
-                humidity = _resample(_maybe_get("Humidity"))
-                wind_speed = _resample(_maybe_get("WindSpeed"))
-                wind_direction = _resample(_maybe_get("WindDirection"))
-                rainfall_raw = _maybe_get("Rainfall")
-                rainfall = _resample(rainfall_raw.astype(float)) if rainfall_raw is not None else None
-
-                weather_resampled = {
-                    "track_temp": track_temp,
-                    "air_temp": air_temp,
-                    "humidity": humidity,
-                    "wind_speed": wind_speed,
-                    "wind_direction": wind_direction,
-                    "rainfall": rainfall,
-                }
-        except Exception as e:
-            print(f"Weather data could not be processed: {e}")
+    weather_resampled = resample_weather(session, timeline, global_t_min)
 
     # 5. Build the frames + LIVE LEADERBOARD
     frames = []
@@ -367,21 +363,7 @@ def get_race_telemetry(session, session_type='R'):
                 "drs": car['drs'],
             }
 
-        weather_snapshot = {}
-        if weather_resampled:
-            try:
-                wt = weather_resampled
-                rain_val = wt["rainfall"][i] if wt.get("rainfall") is not None else 0.0
-                weather_snapshot = {
-                    "track_temp": float(wt["track_temp"][i]) if wt.get("track_temp") is not None else None,
-                    "air_temp": float(wt["air_temp"][i]) if wt.get("air_temp") is not None else None,
-                    "humidity": float(wt["humidity"][i]) if wt.get("humidity") is not None else None,
-                    "wind_speed": float(wt["wind_speed"][i]) if wt.get("wind_speed") is not None else None,
-                    "wind_direction": float(wt["wind_direction"][i]) if wt.get("wind_direction") is not None else None,
-                    "rain_state": "RAINING" if rain_val and rain_val >= 0.5 else "DRY",
-                }
-            except Exception as e:
-                print(f"Failed to attach weather data to frame {i}: {e}")
+        weather_snapshot = build_weather_snapshot(weather_resampled, i)
 
         frame_payload = {
             "t": float(t),
@@ -405,6 +387,8 @@ def get_race_telemetry(session, session_type='R'):
             "driver_colors": get_driver_colors(session),
             "track_statuses": formatted_track_statuses,
             "total_laps": int(max_lap_number),
+            "driver_teams": driver_teams,
+            "driver_names": driver_names,
         }, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     print("Saved Successfully!")
@@ -412,6 +396,8 @@ def get_race_telemetry(session, session_type='R'):
     return {
         "frames": frames,
         "driver_colors": get_driver_colors(session),
+        "driver_teams": driver_teams,
+        "driver_names": driver_names,
         "track_statuses": formatted_track_statuses,
         "total_laps": int(max_lap_number),
     }
