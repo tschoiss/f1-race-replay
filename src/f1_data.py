@@ -21,32 +21,6 @@ def enable_cache():
     # Enable local cache
     fastf1.Cache.enable_cache('.fastf1-cache')
 
-def list_rounds(year):
-    """Lists all rounds for a given year."""
-    enable_cache()
-    print(f"F1 Schedule {year}")
-    schedule = fastf1.get_event_schedule(year)
-    for _, event in schedule.iterrows():
-        print(f"{event['RoundNumber']}: {event['EventName']}")
-
-def list_sprints(year):
-    """Lists all sprint rounds for a given year."""
-    enable_cache()
-    print(f"F1 Sprint Races {year}")
-    schedule = fastf1.get_event_schedule(year)
-    sprint_name = 'sprint_qualifying'
-    if year == 2023:
-        sprint_name = 'sprint_shootout'
-    if year in [2021, 2022]:
-        sprint_name = 'sprint'
-    sprints = schedule[schedule['EventFormat'] == sprint_name]
-    if sprints.empty:
-        print(f"No sprint races found for {year}.")
-    else:
-        for _, event in sprints.iterrows():
-            print(f"{event['RoundNumber']}: {event['EventName']}")
-
-
 FPS = 25
 DT = 1 / FPS
 
@@ -152,6 +126,8 @@ def load_session(year, round_number, session_type='R'):
     session = fastf1.get_session(year, round_number, session_type)
     session.load(telemetry=True, weather=True)
     return session
+
+# The following functions require a loaded session object
 
 def get_driver_colors(session):
     color_mapping = fastf1.plotting.get_driver_color_mapping(session)
@@ -698,10 +674,6 @@ def get_driver_quali_telemetry(session, driver_code: str, quali_segment: str):
     }
 
 
-
-
-
-
 def _process_quali_driver(args):
     """Process qualifying telemetry data for a single driver - must be top-level for multiprocessing"""
     session, driver_code = args
@@ -817,3 +789,31 @@ def get_quali_telemetry(session, session_type='Q'):
         "max_speed": max_speed,
         "min_speed": min_speed,
     }
+
+
+def list_rounds(year):
+    """Lists all rounds for a given year."""
+    enable_cache()
+    print(f"F1 Schedule {year}")
+    schedule = fastf1.get_event_schedule(year)
+    for _, event in schedule.iterrows():
+        print(f"{event['RoundNumber']}: {event['EventName']}")
+    sys.exit()
+
+def list_sprints(year):
+    """Lists all sprint rounds for a given year."""
+    enable_cache()
+    print(f"F1 Sprint Races {year}")
+    schedule = fastf1.get_event_schedule(year)
+    sprint_name = 'sprint_qualifying'
+    if year == 2023:
+        sprint_name = 'sprint_shootout'
+    if year in [2021, 2022]:
+        sprint_name = 'sprint'
+    sprints = schedule[schedule['EventFormat'] == sprint_name]
+    if sprints.empty:
+        print(f"No sprint races found for {year}.")
+    else:
+        for _, event in sprints.iterrows():
+            print(f"{event['RoundNumber']}: {event['EventName']}")
+    sys.exit()
