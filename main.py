@@ -1,10 +1,10 @@
-from src.f1_data import get_race_telemetry, enable_cache, get_circuit_rotation, load_session, get_quali_telemetry, download_driver_headshots_img
+from src.f1_data import get_race_telemetry, enable_cache, get_circuit_rotation, load_session, get_quali_telemetry, list_rounds, list_sprints
 from src.arcade_replay import run_arcade_replay
 
 from src.interfaces.qualifying import run_qualifying_replay
 import sys
 
-def main(year=None, round_number=None, playback_speed=1, session_type='R'):
+def main(year=None, round_number=None, playback_speed=1, session_type='R', visible_hud=True):
   print(f"Loading F1 {year} Round {round_number} Session '{session_type}'")
   session = load_session(year, round_number, session_type)
 
@@ -36,11 +36,33 @@ def main(year=None, round_number=None, playback_speed=1, session_type='R'):
     race_telemetry = get_race_telemetry(session, session_type=session_type)
 
     # Get example lap for track layout
+    # Qualifying lap preferred for DRS zones (fallback to fastest race lap (no DRS data))
+    example_lap = None
+    
+    try:
+        print("Attempting to load qualifying session for track layout...")
+        quali_session = load_session(year, round_number, 'Q')
+        if quali_session is not None and len(quali_session.laps) > 0:
+            fastest_quali = quali_session.laps.pick_fastest()
+            if fastest_quali is not None:
+                quali_telemetry = fastest_quali.get_telemetry()
+                if 'DRS' in quali_telemetry.columns:
+                    example_lap = quali_telemetry
+                    print(f"Using qualifying lap from driver {fastest_quali['Driver']} for DRS Zones")
+    except Exception as e:
+        print(f"Could not load qualifying session: {e}")
 
-    example_lap = session.laps.pick_fastest().get_telemetry()
+    # fallback: Use fastest race lap
+    if example_lap is None:
+        fastest_lap = session.laps.pick_fastest()
+        if fastest_lap is not None:
+            example_lap = fastest_lap.get_telemetry()
+            print("Using fastest race lap (DRS detection may use speed-based fallback)")
+        else:
+            print("Error: No valid laps found in session")
+            return
 
     drivers = session.drivers
-    download_driver_headshots_img(session,drivers)
 
     # Get circuit rotation
 
@@ -48,22 +70,17 @@ def main(year=None, round_number=None, playback_speed=1, session_type='R'):
 
     # Run the arcade replay
 
-    # Check for optional chart flag
-    chart = "--chart" in sys.argv
-
     run_arcade_replay(
         frames=race_telemetry['frames'],
         track_statuses=race_telemetry['track_statuses'],
         example_lap=example_lap,
         drivers=drivers,
-        playback_speed=1.0,
+        playback_speed=playback_speed,
         driver_colors=race_telemetry['driver_colors'],
-        driver_teams=race_telemetry['driver_teams'],
-        driver_names=race_telemetry['driver_names'],
         title=f"{session.event['EventName']} - {'Sprint' if session_type == 'S' else 'Race'}",
         total_laps=race_telemetry['total_laps'],
         circuit_rotation=circuit_rotation,
-        chart=chart,
+        visible_hud=visible_hud
     )
 
 if __name__ == "__main__":
@@ -80,11 +97,20 @@ if __name__ == "__main__":
     round_index = sys.argv.index("--round") + 1
     round_number = int(sys.argv[round_index])
   else:
-    round_number = 24  # Default round number
+    round_number = 12  # Default round number
 
-  playback_speed = 1
+  if "--list-rounds" in sys.argv:
+    list_rounds(year)
+  elif "--list-sprints" in sys.argv:
+    list_sprints(year)
+  else:
+    playback_speed = 1
+  
+  visible_hud = True
+  if "--no-hud" in sys.argv:
+    visible_hud = False
 
-# Session type selection
+  # Session type selection
   session_type = 'SQ' if "--sprint-qualifying" in sys.argv else ('S' if "--sprint" in sys.argv else ('Q' if "--qualifying" in sys.argv else 'R'))
   
-  main(year, round_number, playback_speed, session_type=session_type)
+  main(year, round_number, playback_speed, session_type=session_type, visible_hud=visible_hud)
