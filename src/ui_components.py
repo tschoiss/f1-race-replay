@@ -44,6 +44,7 @@ class LegendComponent(BaseComponent):
             ("[D]       Toggle DRS Zones"),
             ("[B]       Toggle Progress Bar"),
         ]
+        self._text = arcade.Text("", 0, 0, arcade.color.WHITE, 14)
     
     @property
     def visible(self) -> bool:
@@ -94,22 +95,18 @@ class LegendComponent(BaseComponent):
             # Draw brackets if any              
             if brackets:
                 for j in range(len(brackets)):
-                    arcade.Text(
-                        brackets[j],
-                        self.x + (j * (icon_size + 5)),
-                        self.y - (i * 25),
-                        arcade.color.LIGHT_GRAY if i > 0 else arcade.color.WHITE,
-                        14,
-                    ).draw()
+                    self._text.font_size = 14
+                    self._text.bold = (i == 0)
+                    self._text.color = arcade.color.LIGHT_GRAY if i > 0 else arcade.color.WHITE
+                    self._text.text = brackets[j]
+                    self._text.x = self.x + (j * (icon_size + 5))
+                    self._text.y = self.y - (i * 25)
+                    self._text.draw()
             # Draw the text line
-            arcade.Text(
-                line,
-                self.x + (60 if icon_keys else 0),
-                self.y - (i * 25),
-                arcade.color.LIGHT_GRAY if i > 0 else arcade.color.WHITE,
-                14,
-                bold=(i == 0)
-            ).draw()
+            self._text.text = line
+            self._text.x = self.x + (60 if icon_keys else 0)
+            self._text.y = self.y - (i * 25)
+            self._text.draw()
 
 class WeatherComponent(BaseComponent):
     def __init__(self, left=20, width=280, height=130, top_offset=170, visible=True):
@@ -128,6 +125,8 @@ class WeatherComponent(BaseComponent):
                     texture_name = os.path.splitext(filename)[0]
                     texture_path = os.path.join(weather_folder, filename)
                     self._weather_icon_textures[texture_name] = arcade.load_texture(texture_path)
+
+        self._text = arcade.Text("", self.left + 12, 0, arcade.color.LIGHT_GRAY, 14, anchor_y="top")
 
     def set_info(self, info: Optional[dict]):
         self.info = info
@@ -175,6 +174,12 @@ class WeatherComponent(BaseComponent):
         
         start_y = panel_top - 36
         last_y = start_y
+
+        self._text.font_size = 18; self._text.bold = True; self._text.color = arcade.color.WHITE
+        self._text.text = "Weather"
+        self._text.x = self.left + 12; self._text.y = panel_top - 10
+        self._text.draw()
+
         for idx, (label, value, icon_key) in enumerate(weather_lines):
             line_y = start_y - idx * 22
             last_y = line_y
@@ -193,8 +198,13 @@ class WeatherComponent(BaseComponent):
                 )
             
             # Draw text
+
             line_text = f"{label}: {value}"
-            arcade.Text(line_text, self.left + 38, line_y, arcade.color.LIGHT_GRAY, 14, anchor_y="top").draw()
+            
+            self._text.font_size = 14; self._text.bold = False; self._text.color = arcade.color.LIGHT_GRAY
+            self._text.text = line_text
+            self._text.x = self.left + 38; self._text.y = line_y
+            self._text.draw()
 
         # Track the bottom of the weather panel so info boxes can stack below it
         window.weather_bottom = last_y - 20
@@ -791,6 +801,12 @@ class RaceProgressBarComponent(BaseComponent):
         Toggle the visibility of the progress bar
         """
         self._visible = not self._visible
+        
+        # Also hide/show related components
+        for comp in getattr(self, "_related_components", []):
+            if isinstance(comp, BaseComponent):
+                comp.visible = self._visible
+                
         return self._visible
         
     def _calculate_bar_dimensions(self, window):
@@ -1150,7 +1166,6 @@ class RaceControlsComponent(BaseComponent):
         Toggle the visibility of the controls
         """
         self._visible = not self._visible
-        return self._visible
 
     def set_visible(self):
         """
@@ -1224,7 +1239,7 @@ class RaceControlsComponent(BaseComponent):
                     rect=rect,
                     texture=texture,
                     angle=0,
-                    alpha=255
+                    alpha = 255
                 )
     def _draw_pause_icon(self, x: float, y: float):
         self.draw_hover_effect('play_pause', x, self.center_y)
@@ -1237,7 +1252,7 @@ class RaceControlsComponent(BaseComponent):
                     rect=rect,
                     texture=texture,
                     angle=0,
-                    alpha=255
+                    alpha = 255
                 )
     def _draw_forward_icon(self, x: float, y: float):
         self.draw_hover_effect('forward', x, self.center_y)
@@ -1250,7 +1265,7 @@ class RaceControlsComponent(BaseComponent):
                     rect=rect,
                     texture=texture,
                     angle=180,
-                    alpha=255
+                    alpha = 255
                 )
     def _draw_rewind_icon(self, x: float, y: float):
         self.draw_hover_effect('rewind', x, self.center_y)
@@ -1263,7 +1278,7 @@ class RaceControlsComponent(BaseComponent):
                     rect=rect,
                     texture=texture,
                     angle=0,
-                    alpha=255
+                    alpha = 255
                 )
     def _draw_speed_comp(self, x: float, y: float, speed: float):
         """Draw speed multiplier text."""
@@ -1303,8 +1318,8 @@ class RaceControlsComponent(BaseComponent):
             
             # Draw speed text in center
             if not self._hide_speed_text:
-                arcade.Text(f"{speed:.1f}x", x, y - 5,
-                            arcade.color.WHITE, 14,
+                arcade.Text(f"{speed}x", x, y - 5,
+                            arcade.color.WHITE, 11,
                             anchor_x="center",
                             bold=True).draw()
             
@@ -1356,7 +1371,8 @@ class RaceControlsComponent(BaseComponent):
         elif self._point_in_rect(x, y,self.speed_increase_rect):
             # Increase speed
             if hasattr(window, 'playback_speed'):
-                window.playback_speed = window.playback_speed * 2
+                if window.playback_speed < 1024:
+                    window.playback_speed = window.playback_speed * 2
             return True
         elif self._point_in_rect(x, y,self.speed_decrease_rect):
             # Decrease speed

@@ -14,8 +14,8 @@ from src.ui_components import (
 )
 
 
-SCREEN_WIDTH = 1920
-SCREEN_HEIGHT = 1200
+SCREEN_WIDTH = 1280
+SCREEN_HEIGHT = 720
 SCREEN_TITLE = "F1 Race Replay"
 
 class F1RaceReplayWindow(arcade.Window):
@@ -24,6 +24,7 @@ class F1RaceReplayWindow(arcade.Window):
                  left_ui_margin=340, right_ui_margin=260, total_laps=None, visible_hud=True):
         # Set resizable to True so the user can adjust mid-sim
         super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, title, resizable=True)
+        self.maximize()
 
         self.frames = frames
         self.track_statuses = track_statuses
@@ -114,6 +115,11 @@ class F1RaceReplayWindow(arcade.Window):
         self.bg_texture = arcade.load_texture(bg_path) if os.path.exists(bg_path) else None
 
         arcade.set_background_color(arcade.color.BLACK)
+
+        # Persistent UI Text objects (avoid per-frame allocations)
+        self.lap_text = arcade.Text("", 20, self.height - 40, arcade.color.WHITE, 24, anchor_y="top")
+        self.time_text = arcade.Text("", 20, self.height - 80, arcade.color.WHITE, 20, anchor_y="top")
+        self.status_text = arcade.Text("", 20, self.height - 120, arcade.color.WHITE, 24, bold=True, anchor_y="top")
 
         # Trigger initial scaling calculation
         self.update_scaling(self.width, self.height)
@@ -224,6 +230,14 @@ class F1RaceReplayWindow(arcade.Window):
         self.leaderboard_comp.x = max(20, self.width - self.right_ui_margin + 12)
         for c in (self.leaderboard_comp, self.weather_comp, self.legend_comp, self.driver_info_comp, self.progress_bar_comp, self.race_controls_comp):
             c.on_resize(self)
+        
+        # update persistent text positions
+        self.lap_text.x = 20
+        self.lap_text.y = self.height - 40
+        self.time_text.x = 20
+        self.time_text.y = self.height - 80
+        self.status_text.x = 20
+        self.status_text.y = self.height - 120
 
     def world_to_screen(self, x, y):
         # Rotate around the track centre (if rotation is set), then scale+translate
@@ -374,35 +388,29 @@ class F1RaceReplayWindow(arcade.Window):
             lap_str += f"/{self.total_laps}"
 
         # Draw HUD - Top Left
-        if self.visible_hud:                      
-            arcade.Text(lap_str,
-                            20, self.height - 40, 
-                            arcade.color.WHITE, 24, anchor_y="top").draw()
-            
-            arcade.Text(f"Race Time: {time_str} (x{self.playback_speed})", 
-                            20, self.height - 80, 
-                            arcade.color.WHITE, 20, anchor_y="top").draw()
-            
+        if self.visible_hud:
+            self.lap_text.text = lap_str
+            self.time_text.text = f"Race Time: {time_str} (x{self.playback_speed})"
+            # default no status text
+            self.status_text.text = ""
+            # update status color and text if required
             if current_track_status == "2":
-                status_text = "YELLOW FLAG"
-                arcade.Text(status_text, 
-                                20, self.height - 120,
-                                arcade.color.YELLOW, 24, bold=True, anchor_y="top").draw()
+                self.status_text.text = "YELLOW FLAG"
+                self.status_text.color = arcade.color.YELLOW
             elif current_track_status == "5":
-                status_text = "RED FLAG"
-                arcade.Text(status_text, 
-                                20, self.height - 120, 
-                                arcade.color.RED, 24, bold=True, anchor_y="top").draw()
+                self.status_text.text = "RED FLAG"
+                self.status_text.color = arcade.color.RED
             elif current_track_status == "6":
-                status_text = "VIRTUAL SAFETY CAR"
-                arcade.Text(status_text, 
-                                20, self.height - 120, 
-                                arcade.color.ORANGE, 24, bold=True, anchor_y="top").draw()
+                self.status_text.text = "VIRTUAL SAFETY CAR"
+                self.status_text.color = arcade.color.ORANGE
             elif current_track_status == "4":
-                status_text = "SAFETY CAR"
-                arcade.Text(status_text, 
-                                20, self.height - 120, 
-                                arcade.color.BROWN, 24, bold=True, anchor_y="top").draw()
+                self.status_text.text = "SAFETY CAR"
+                self.status_text.color = arcade.color.BROWN
+
+            self.lap_text.draw()
+            self.time_text.draw()
+            if self.status_text.text:
+                self.status_text.draw()
 
         # Weather component (set info then draw)
         weather_info = frame.get("weather") if frame else None
@@ -458,8 +466,9 @@ class F1RaceReplayWindow(arcade.Window):
             self.frame_index = max(self.frame_index - 10.0, 0.0)
             self.race_controls_comp.flash_button('rewind')
         elif symbol == arcade.key.UP:
-            self.playback_speed *= 2.0
-            self.race_controls_comp.flash_button('speed_increase')
+            if self.playback_speed < 1024.0:
+                self.playback_speed *= 2.0
+                self.race_controls_comp.flash_button('speed_increase')
         elif symbol == arcade.key.DOWN:
             self.playback_speed = max(0.1, self.playback_speed / 2.0)
             self.race_controls_comp.flash_button('speed_decrease')

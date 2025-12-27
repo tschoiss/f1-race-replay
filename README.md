@@ -70,6 +70,20 @@ To get started with this project locally, you can follow these steps:
 
 ## Usage
 
+**NEW GUI MENU:** To use the new GUI menu system, you can simply run:
+```bash
+python main.py --gui
+```
+This will open a graphical interface where you can select the year and round of the race weekend you want to replay. This is still a new feature, so please report any issues you encounter.
+
+**NEW CLI MENU:** To use the new CLI menu system, you can simply run:
+```bash
+python main.py --cli
+```
+This will prompt you with series of questions and a list of options to make your choice from.
+
+If you would prefer to use the command line arguments directly, you can do so as follows:
+
 Run the main script and specify the year and round:
 ```bash
 python main.py --year 2025 --round 12
